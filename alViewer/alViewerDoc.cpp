@@ -10,9 +10,11 @@
 #endif
 
 #include "alViewerDoc.h"
-#include "alBitmapData.h"
+#include "CalBitmapData.h"
+#include "CStreamCap.h"
 #include "DlgRawPaser.h"
 #include <propkey.h>
+#include <assert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -33,6 +35,9 @@ CalViewerDoc::CalViewerDoc()
 	// TODO: add one-time construction code here
 	m_alBitmapData = std::shared_ptr<CalBitmapData>(new CalBitmapData());
 
+	DocMode = 0;	//0: common 1: raw 2: uvc
+	pExitEvent = nullptr;
+	m_pVideoShowThread = nullptr;
 	m_ImgRawWidth = Global::RAW_IMAGE_WIDTH;
 	m_ImgRawHeight = Global::RAW_IMAGE_HEIGHT;
 	m_ImgRawFormat = Global::RAW_IMAGE_FORMAT;
@@ -40,11 +45,13 @@ CalViewerDoc::CalViewerDoc()
 
 CalViewerDoc::~CalViewerDoc()
 {
+	StopPreviewThread();
+
 	Global::RAW_IMAGE_WIDTH = ImgWidth();
 	Global::RAW_IMAGE_HEIGHT = ImgHeight();
 	Global::RAW_IMAGE_FORMAT = ImgFormat();
 
-	UpdateStatusToolbarStatus(false);
+	//UpdateStatusToolbarStatus(false);
 }
 
 BOOL CalViewerDoc::OnNewDocument()
@@ -181,60 +188,88 @@ BOOL CalViewerDoc::OnOpenDocument(LPCTSTR lpszPathName)
 	const int extLen = strFileName.GetLength() - strFileName.ReverseFind('.') - 1;
 	CString strExtName = strFileName.Right(extLen);
 
-	if (strExtName.CompareNoCase(_T("bmp")) == 0)
+	if (strExtName.CompareNoCase(_T("UVC")) == 0)
 	{
-		m_alBitmapData->LoadCommonFile(lpszPathName);	
+		DocMode = 2;
+		CreateNewVideoStream();
 	}
-	else if (strExtName.CompareNoCase(_T("jpg")) == 0 ||
-		strExtName.CompareNoCase(_T("jpeg")) == 0)
+	else
 	{
-		m_alBitmapData->LoadCommonFile(lpszPathName);
-	}
-	else if (strExtName.CompareNoCase(_T("jpg")) == 0)
-	{
-		m_alBitmapData->LoadCommonFile(lpszPathName);
-	}
-	else if (strExtName.CompareNoCase(_T("png")) == 0)
-	{
-		m_alBitmapData->LoadCommonFile(lpszPathName);
+		if (strExtName.CompareNoCase(_T("bmp")) == 0)
+		{
+			m_alBitmapData->LoadCommonFile(lpszPathName);
+		}
+		else if (strExtName.CompareNoCase(_T("jpg")) == 0 ||
+			strExtName.CompareNoCase(_T("jpeg")) == 0)
+		{
+			m_alBitmapData->LoadCommonFile(lpszPathName);
+		}
+		else if (strExtName.CompareNoCase(_T("jpg")) == 0)
+		{
+			m_alBitmapData->LoadCommonFile(lpszPathName);
+		}
+		else if (strExtName.CompareNoCase(_T("png")) == 0)
+		{
+			m_alBitmapData->LoadCommonFile(lpszPathName);
+			UpdateStatusSize(ImgWidth(), ImgHeight());
+		}
+		else if (strExtName.CompareNoCase(_T("tif")) == 0 ||
+			strExtName.CompareNoCase(_T("tiff")) == 0)
+		{
+			m_alBitmapData->LoadCommonFile(lpszPathName);
+		}
+		else if (strExtName.CompareNoCase(_T("raw")) == 0)
+		{
+			DocMode = 1;
+
+			// Load Raw image format
+			CDlgRawPaser dlgRawPaser(NULL, this);
+			dlgRawPaser.SetRawPath(lpszPathName);
+			dlgRawPaser.SetWidth(m_ImgRawWidth);
+			dlgRawPaser.SetHeight(m_ImgRawHeight);
+			dlgRawPaser.SetFormat(m_ImgRawFormat);
+
+			if (dlgRawPaser.DoModal() == IDOK)
+			{
+				//RAW_FORMAT_PK format_pk;
+				m_ImgRawWidth = dlgRawPaser.GetWidth();
+				m_ImgRawHeight = dlgRawPaser.GetHeight();
+				m_ImgRawFormat = dlgRawPaser.GetFormat();
+			}
+			else
+			{
+				m_ImgRawWidth = 720;
+				m_ImgRawHeight = 480;
+				m_ImgRawFormat = 0;
+
+				return FALSE;
+			}
+		}
+
+		// Update infomation
 		UpdateStatusSize(ImgWidth(), ImgHeight());
 	}
-	else if (strExtName.CompareNoCase(_T("tif")) == 0 ||
-		strExtName.CompareNoCase(_T("tiff")) == 0)
-	{
-		m_alBitmapData->LoadCommonFile(lpszPathName);
-	}
-	else if (strExtName.CompareNoCase(_T("raw")) == 0)
-	{
-		// Load Raw image format
-		CDlgRawPaser dlgRawPaser(NULL, this);
-		dlgRawPaser.SetRawPath(lpszPathName);
-		dlgRawPaser.SetWidth(m_ImgRawWidth);
-		dlgRawPaser.SetHeight(m_ImgRawHeight);
-		dlgRawPaser.SetFormat(m_ImgRawFormat);
 
-		if (dlgRawPaser.DoModal() == IDOK)
-		{
-			//RAW_FORMAT_PK format_pk;
-			m_ImgRawWidth = dlgRawPaser.GetWidth();
-			m_ImgRawHeight = dlgRawPaser.GetHeight();
-			m_ImgRawFormat = dlgRawPaser.GetFormat();
-		}
-		else
-		{
-			m_ImgRawWidth = 720;
-			m_ImgRawHeight = 480;
-			m_ImgRawFormat = 0;
-
-			return FALSE;
-		}
-	}
-
-	// Update infomation
-	UpdateStatusSize(ImgWidth(), ImgHeight());
 	UpdateStatusToolbarStatus(true);
 
 	return TRUE;
+}
+
+void CalViewerDoc::StopPreviewThread()
+{
+	if (pExitEvent)
+	{
+		pExitEvent->SetEvent();
+		while (::WaitForSingleObject(m_pVideoShowThread->m_hThread, 1) != WAIT_OBJECT_0)
+			ApplicationDoEvent();
+
+		delete pExitEvent;
+		pExitEvent = nullptr;
+	}
+
+	if (m_pVideoShowThread)
+		delete m_pVideoShowThread;
+	m_pVideoShowThread = nullptr;
 }
 
 void CalViewerDoc::UpdateStatusSize(int w, int h)
@@ -273,10 +308,116 @@ void CalViewerDoc::UpdateStatusRatio(double scale)
 	AfxGetMainWnd()->SendMessage(WM_USER + 104, 0, (LPARAM)tmp.GetBuffer());
 }
 
+void CalViewerDoc::UpdateDrawViewRect()
+{
+	AfxGetMainWnd()->SendMessage(WM_USER + 105, 0, 0);
+}
+
 void CalViewerDoc::UpdateStatusToolbarStatus(bool bEnable)
 {
 	if(bEnable)
 		AfxGetMainWnd()->SendMessage(WM_USER + 200, 0, 0);
 	else
 		AfxGetMainWnd()->SendMessage(WM_USER + 201, 0, 0);
+}
+
+void CalViewerDoc::ApplicationDoEvent()
+{
+	MSG msg;
+	while (::PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+	{
+		if (msg.message == WM_QUIT)
+			return;
+
+		::TranslateMessage(&msg);
+		::DispatchMessage(&msg);
+	}
+
+	return;
+}
+
+void CalViewerDoc::CreateNewVideoStream()
+{
+	if (m_pVideoShowThread == nullptr)
+	{
+		pExitEvent = new CEvent(FALSE, TRUE); // Manu is true to keep SetEvent status
+		m_pVideoShowThread = ::AfxBeginThread(CaptureVideoFrameThread, (LPVOID)this, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED, NULL);
+		m_pVideoShowThread->m_bAutoDelete = FALSE;
+		m_pVideoShowThread->ResumeThread();
+		//SetThreadIdealProcessor(m_pVideoShowThread->m_hThread, 1);
+	}
+}
+
+void CalViewerDoc::UpdateViewFrame()
+{
+	CView*pView = NULL;
+	POSITION pos = GetFirstViewPosition();
+
+	if (pos != NULL)
+	{
+		pView = GetNextView(pos);
+
+		if (pView != NULL)
+		{
+			pView->Invalidate(FALSE);
+			pView->UpdateWindow();
+		}
+	}
+}
+
+UINT CalViewerDoc::CaptureVideoFrameThread(LPVOID lpParam)
+{
+	CalViewerDoc* doc = (CalViewerDoc*)lpParam;
+	
+	CStreamCap* videoDevice = new CStreamCap(AfxGetMainWnd()->GetSafeHwnd());
+
+	if (!videoDevice->InitialCap())
+		return 0;
+
+	if (!videoDevice->FindDevices())
+		return 0;
+
+	if (!videoDevice->ChooseDevices(_T(""), _T("")))
+		return 0;
+
+	if (!videoDevice->BuildPreviewGraph(AfxGetMainWnd()->GetSafeHwnd()))
+		return 0;
+
+	if (!videoDevice->StartPreview())
+		return 0;
+
+	const int width = videoDevice->VideoWidth();
+	const int height = videoDevice->VideoHeight();
+	const int bufSize = width * height;
+	doc->BmpData()->m_pImageBuffer = new BYTE[bufSize*3];	
+	doc->BmpData()->BmpInfo.bmiHeader.biWidth = width;
+	doc->BmpData()->BmpInfo.bmiHeader.biHeight = height;
+	doc->UpdateStatusSize(width, height);
+	doc->UpdateDrawViewRect();
+
+	// Capture loop
+	while (::WaitForSingleObject(doc->pExitEvent->m_hObject, 1) != WAIT_OBJECT_0)
+	{
+		if (videoDevice->GrabFrame((unsigned char *)doc->BmpData()->m_pImageBuffer, false, false))
+		{
+			doc->BmpData()->CreateBitmapInfo(width, height, 8, 3);
+		}
+
+		doc->UpdateViewFrame();
+	}
+
+	// Something wrong!! Need to fix
+	if (!videoDevice->StopPreview())
+		return 0;
+
+	if (!videoDevice->ReleaseCap())
+		return 0;
+
+	delete videoDevice; 
+	videoDevice = nullptr;
+
+	// Terminate the thread
+	::AfxEndThread(0, FALSE);
+
+	return 1;
 }

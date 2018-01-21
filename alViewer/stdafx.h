@@ -35,7 +35,7 @@
 
 
 #include <gdiplus.h>
-//#pragma comment(lib, "gdiplus")
+#pragma comment(lib, "gdiplus")
 using namespace Gdiplus;
 
 #include "Define_Globaldata.h"

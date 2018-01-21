@@ -18,18 +18,23 @@ public:
 	int ImgWidth();
 	int ImgHeight();
 	int ImgFormat();
+	UINT DocMode;
 	void* ImgBuffer();
 	BITMAPINFO* ImgBitmapInfo();
 
 // Operations
 public:
 	std::shared_ptr<CalBitmapData> BmpData();
+	void StopPreviewThread();
 	void UpdateStatusSize(int w, int h);
 	void UpdateStatusPos(int x, int y);
 	void UpdateStatusRGB(UINT r, UINT g, UINT b);
 	void UpdateStatusRect(int x, int y, int w, int h);
 	void UpdateStatusRatio(double scale);
 	void UpdateStatusToolbarStatus(bool enable);
+	void UpdateDrawViewRect();
+	void UpdateViewFrame();
+	void ApplicationDoEvent();
 	CSize GetDocSize() { return m_sizeDoc; }
 
 private:
@@ -37,6 +42,13 @@ private:
 	int m_ImgRawHeight;
 	int m_ImgRawFormat;
 	std::shared_ptr<CalBitmapData> m_alBitmapData;
+
+// Capture thread
+private:
+	CEvent* pExitEvent;
+	CWinThread*	m_pVideoShowThread;
+	static UINT CaptureVideoFrameThread(LPVOID lpParam);
+	void CreateNewVideoStream();
 
 // Overrides
 public:

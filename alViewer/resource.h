@@ -16,6 +16,7 @@
 #define IDD_DLG_RAWPASER                314
 #define ID_INDICATOR_STATUS_POS         314
 #define IDR_MAINTOOLBAR                 317
+#define IDR_VIDEOTOOLBAR                319
 #define IDC_PREVIEW                     1000
 #define IDC_EDIT_RAW_W                  1001
 #define IDC_EDIT_RAW_H                  1002
@@ -31,13 +32,15 @@
 #define ID_VIEWER_ZOOMIN                32773
 #define ID_VIEWER_ZOOMOUT               32774
 #define ID_VIEWER_ZOOMFIT               32775
+#define ID_PREVIEWE_START               32776
+#define ID_PREVIEWE_STOP                32777
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        319
-#define _APS_NEXT_COMMAND_VALUE         32776
+#define _APS_NEXT_RESOURCE_VALUE        321
+#define _APS_NEXT_COMMAND_VALUE         32778
 #define _APS_NEXT_CONTROL_VALUE         1007
 #define _APS_NEXT_SYMED_VALUE           314
 #endif

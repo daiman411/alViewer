@@ -30,15 +30,17 @@ public:
 
 protected:  // control bar embedded members
 	CToolBar          m_wndToolBar;
+	CToolBar          m_wndVideoBar;
 	CStatusBar        m_wndStatusBar;
 	bool			  m_bEnableToolbar;
+	bool			  m_bEnableVideobar;
 
 public:
 	TOOL_FUNC		  m_ToolBarFunc;
 
 public:
 	bool IsSelectMode() { return m_ToolBarFunc == TOOL_FUNC_SELECT; }
-
+	void DockControlBarLeftOf(CToolBar* Bar, CToolBar* LeftOf);
 
 public:
 	LRESULT OnUpdateStatusSize(WPARAM wParam, LPARAM lParam);
@@ -48,6 +50,8 @@ public:
 	LRESULT OnUpdateStatusRatio(WPARAM wParam, LPARAM lParam);
 	LRESULT OnEnableToolbarStatus(WPARAM wParam, LPARAM lParam);
 	LRESULT OnDisableToolbarStatus(WPARAM wParam, LPARAM lParam);
+	LRESULT OnUpdateDrawViewRect(WPARAM wParam, LPARAM lParam);
+	LRESULT OnStopPreviewVideo(WPARAM wParam, LPARAM lParam);
 	void OnFileOpen();
 
 // Generated message map functions
@@ -69,6 +73,10 @@ public:
 	afx_msg void OnUpdateViewerZoomfit(CCmdUI *pCmdUI);
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnUpdatePrevieweStart(CCmdUI *pCmdUI);
+	afx_msg void OnPrevieweStart();
+	afx_msg void OnUpdatePrevieweStop(CCmdUI *pCmdUI);
+	afx_msg void OnPrevieweStop();
 };
 
 

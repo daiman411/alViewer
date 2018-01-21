@@ -23,6 +23,7 @@ public:
 	void ZoomView_In();
 	void ZoomView_Out();
 	void ZoomView_Fit();
+	void UpdateDrawView();
 
 // Overrides
 public:
@@ -61,7 +62,6 @@ protected:
 	std::unique_ptr<CDrawCanvas> m_pDrawCanvas;
 
 private:
-	Rect CRect2Rect(CRect &rc);
 	CPoint ImagePtFromPB(CPoint &pt, CRect &rcDraw, int w, int h);
 	CPoint PBPtFromImage(CPoint &pt, CRect &rcDraw, int w, int h);
 	CRect ImageRectFromPB(CRect &rc, CRect &rcDraw, int w, int h);
@@ -70,6 +70,7 @@ private:
 	CRect CalcDrawRect(CRect &client_rect, CPoint &offset, double scale, int w, int h);
 	CRect CalcScaleRect(CRect draw_rect, double scale, int w, int h);
 	CPoint CalcDrawOffset(CRect &rcImgROI, CPoint center_pt);
+	Rect CRect2Rect(CRect &rc);
 	double GetBestFitScale(CRect &client, CRect &image);
 	void ZoomView(short zDelta, bool cursor = false);
 

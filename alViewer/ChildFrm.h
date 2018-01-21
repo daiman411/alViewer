@@ -30,4 +30,6 @@ public:
 // Generated message map functions
 protected:
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnClose();
 };

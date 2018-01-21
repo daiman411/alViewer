@@ -69,6 +69,8 @@ END
 
 IDR_MAINTOOLBAR         BITMAP                  "res\\toolbar1.bmp"
 
+IDR_VIDEOTOOLBAR        BITMAP                  "res\\bmp00001.bmp"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -82,6 +84,12 @@ BEGIN
     BUTTON      ID_VIEWER_ZOOMIN
     BUTTON      ID_VIEWER_ZOOMOUT
     BUTTON      ID_VIEWER_ZOOMFIT
+END
+
+IDR_VIDEOTOOLBAR TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_PREVIEWE_START
+    BUTTON      ID_PREVIEWE_STOP
 END
 
 
@@ -190,6 +198,8 @@ STRINGTABLE
 BEGIN
     ID_VIEWER_ARROW         "Use mouse cursor to query info\nArrow"
     ID_VIEWER_SELECT        "Draw rectangle to calculate mean\nSelect"
+    ID_PREVIEWE_START       "Preview video stream\nPreview"
+    ID_PREVIEWE_STOP        "Stop preview video stream\nPreviewStop"
 END
 
 #endif    // Chinese (Traditional, Taiwan) resources
@@ -202,20 +212,6 @@ END
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Icon
-//
-
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "res\\if_ic_settings_display_48px_352100.ico"
-
-IDR_alViewerTYPE        ICON                    "res\\alViewerDoc.ico"
-
-IDR_MAINFRAME_3         ICON                    "res\\if_viewer_text_103798.ico"
-
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -243,6 +239,68 @@ BEGIN
     BUTTON      ID_FILE_PRINT
     BUTTON      ID_APP_ABOUT
 END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 170, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About alViewer"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
+    LTEXT           "alViewer, Version 1.0",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2017",IDC_STATIC,42,26,114,8
+    DEFPUSHBUTTON   "OK",IDOK,113,41,50,14,WS_GROUP
+    LTEXT           "Author: JC",IDC_STATIC,42,38,63,8
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 163
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_ABOUTBOX AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\if_ic_settings_display_48px_352100.ico"
+
+IDR_alViewerTYPE        ICON                    "res\\alViewerDoc.ico"
+
+IDR_MAINFRAME_3         ICON                    "res\\if_viewer_text_103798.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -346,24 +404,6 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Dialog
-//
-
-IDD_ABOUTBOX DIALOGEX 0, 0, 170, 62
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "About alViewer"
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
-    LTEXT           "alViewer, Version 1.0",IDC_STATIC,42,14,114,8,SS_NOPREFIX
-    LTEXT           "Copyright (C) 2017",IDC_STATIC,42,26,114,8
-    DEFPUSHBUTTON   "OK",IDOK,113,41,50,14,WS_GROUP
-    LTEXT           "Author: JC",IDC_STATIC,42,38,63,8
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
 // Version
 //
 
@@ -398,36 +438,6 @@ BEGIN
     BEGIN
         VALUE "Translation", 0x409, 1200
     END
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// DESIGNINFO
-//
-
-#ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO
-BEGIN
-    IDD_ABOUTBOX, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 163
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 55
-    END
-END
-#endif    // APSTUDIO_INVOKED
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// AFX_DIALOG_LAYOUT
-//
-
-IDD_ABOUTBOX AFX_DIALOG_LAYOUT
-BEGIN
-    0
 END
 
 

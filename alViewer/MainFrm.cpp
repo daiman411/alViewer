@@ -7,6 +7,7 @@
 
 #include "MainFrm.h"
 #include "alViewerView.h"
+#include "alViewerDoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,8 +25,10 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWnd)
 	ON_MESSAGE(WM_USER + 102, OnUpdateStatusRGB)
 	ON_MESSAGE(WM_USER + 103, OnUpdateStatusRect)
 	ON_MESSAGE(WM_USER + 104, OnUpdateStatusRatio)
+	ON_MESSAGE(WM_USER + 105, OnUpdateDrawViewRect)
 	ON_MESSAGE(WM_USER + 200, OnEnableToolbarStatus)
 	ON_MESSAGE(WM_USER + 201, OnDisableToolbarStatus)
+	ON_MESSAGE(WM_USER + 301, OnStopPreviewVideo)
 	ON_COMMAND(ID_FILE_OPEN, &CMainFrame::OnFileOpen)
 	ON_UPDATE_COMMAND_UI(ID_VIEWER_ARROW, &CMainFrame::OnUpdateViewerArrow)
 	ON_COMMAND(ID_VIEWER_ARROW, &CMainFrame::OnViewerArrow)
@@ -39,6 +42,10 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWnd)
 	ON_UPDATE_COMMAND_UI(ID_VIEWER_ZOOMFIT, &CMainFrame::OnUpdateViewerZoomfit)
 	ON_WM_SIZING()
 	ON_WM_SIZE()
+	ON_UPDATE_COMMAND_UI(ID_PREVIEWE_START, &CMainFrame::OnUpdatePrevieweStart)
+	ON_COMMAND(ID_PREVIEWE_START, &CMainFrame::OnPrevieweStart)
+	ON_UPDATE_COMMAND_UI(ID_PREVIEWE_STOP, &CMainFrame::OnUpdatePrevieweStop)
+	ON_COMMAND(ID_PREVIEWE_STOP, &CMainFrame::OnPrevieweStop)
 END_MESSAGE_MAP()
 
 static UINT indicators[] =
@@ -60,6 +67,7 @@ CMainFrame::CMainFrame()
 {
 	// TODO: add member initialization code here
 	m_bEnableToolbar = false;
+	m_bEnableVideobar = true;
 	m_ToolBarFunc = TOOL_FUNC_NONE;
 }
 
@@ -72,10 +80,17 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	if (CMDIFrameWnd::OnCreate(lpCreateStruct) == -1)
 		return -1;
 
-	if (!m_wndToolBar.CreateEx(this, TBSTYLE_FLAT, WS_CHILD | WS_VISIBLE | CBRS_TOP | CBRS_GRIPPER | CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC) ||
+	if (!m_wndToolBar.CreateEx(this, TBSTYLE_FLAT, WS_CHILD | WS_VISIBLE | CBRS_TOP /*| CBRS_GRIPPER*/ | CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC) ||
 		!m_wndToolBar.LoadToolBar(IDR_MAINTOOLBAR))
 	{
 		TRACE0("Failed to create toolbar\n");
+		return -1;      // fail to create
+	}
+
+	if (!m_wndVideoBar.CreateEx(this, TBSTYLE_FLAT, WS_CHILD | WS_VISIBLE | CBRS_TOP /*| CBRS_GRIPPER*/ | CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC) ||
+		!m_wndVideoBar.LoadToolBar(IDR_VIDEOTOOLBAR))
+	{
+		TRACE0("Failed to create videobar\n");
 		return -1;      // fail to create
 	}
 
@@ -98,11 +113,37 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	// TODO: Delete these three lines if you don't want the toolbar to be dockable
 	m_wndToolBar.EnableDocking(CBRS_ALIGN_ANY);
+	m_wndVideoBar.EnableDocking(CBRS_ALIGN_ANY);
 	EnableDocking(CBRS_ALIGN_ANY);
 	DockControlBar(&m_wndToolBar);
-
+	DockControlBarLeftOf(&m_wndVideoBar, &m_wndToolBar);
 	
 	return 0;
+}
+
+void CMainFrame::DockControlBarLeftOf(CToolBar* Bar, CToolBar* LeftOf)
+{
+	CRect rect;
+	DWORD dw;
+	UINT n;
+
+	// get MFC to adjust the dimensions of all docked ToolBars
+	// so that GetWindowRect will be accurate
+	RecalcLayout(TRUE);
+
+	LeftOf->GetWindowRect(&rect);
+	rect.OffsetRect(1, 0);
+	dw = LeftOf->GetBarStyle();
+	n = 0;
+	n = (dw&CBRS_ALIGN_TOP) ? AFX_IDW_DOCKBAR_TOP : n;
+	n = (dw&CBRS_ALIGN_BOTTOM && n == 0) ? AFX_IDW_DOCKBAR_BOTTOM : n;
+	n = (dw&CBRS_ALIGN_LEFT && n == 0) ? AFX_IDW_DOCKBAR_LEFT : n;
+	n = (dw&CBRS_ALIGN_RIGHT && n == 0) ? AFX_IDW_DOCKBAR_RIGHT : n;
+
+	// When we take the default parameters on rect, DockControlBar will dock
+	// each Toolbar on a seperate line. By calculating a rectangle, we
+	// are simulating a Toolbar being dragged to that location and docked.
+	DockControlBar(Bar, n, &rect);
 }
 
 BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
@@ -185,6 +226,33 @@ LRESULT CMainFrame::OnUpdateStatusRatio(WPARAM wParam, LPARAM lParam)
 	CString msgText(str);
 	m_wndStatusBar.SetPaneText(5, msgText, 1);
 	m_wndStatusBar.Invalidate();
+
+	return 0;
+}
+
+LRESULT CMainFrame::OnUpdateDrawViewRect(WPARAM wParam, LPARAM lParam)
+{
+	// TODO: Add your command handler code here
+	CMDIChildWnd* pChildWnd = MDIGetActive();
+
+	if (pChildWnd)
+	{
+		CalViewerView* pMainView = static_cast<CalViewerView*>(pChildWnd->GetActiveView());
+		pMainView->UpdateDrawView();
+	}
+
+	return 0;
+}
+
+LRESULT CMainFrame::OnStopPreviewVideo(WPARAM wParam, LPARAM lParam)
+{
+	CMDIChildWnd* pChildWnd = MDIGetActive();
+
+	if (pChildWnd)
+	{
+		CalViewerDoc* pMainDoc = static_cast<CalViewerDoc*>(pChildWnd->GetActiveView()->GetDocument());
+		pMainDoc->StopPreviewThread();
+	}
 
 	return 0;
 }
@@ -345,4 +413,56 @@ void CMainFrame::OnSize(UINT nType, int cx, int cy)
 	m_wndStatusBar.SetPaneInfo(4, ID_INDICATOR_STATUS_RECT, SBPS_NORMAL, (int)(rect.Width() * 0.8 / 6));
 	m_wndStatusBar.SetPaneInfo(5, ID_INDICATOR_STATUS_PROG, SBPS_NORMAL, (int)(rect.Width() * 2.8 / 6));
 
+}
+
+
+void CMainFrame::OnUpdatePrevieweStart(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
+	pCmdUI->Enable(m_bEnableVideobar);
+}
+
+void CMainFrame::OnPrevieweStart()
+{
+	// TODO: Add your command handler code here
+	CWinApp* pApp = AfxGetApp();
+	ASSERT(pApp != NULL);
+	CString fileName = _T("C:\\Video.UVC");
+	pApp->OpenDocumentFile(fileName.GetBuffer(), FALSE);
+}
+
+void CMainFrame::OnUpdatePrevieweStop(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
+	pCmdUI->Enable(m_bEnableVideobar);
+}
+
+void CMainFrame::OnPrevieweStop()
+{
+	// TODO: Add your command handler code here
+	OnStopPreviewVideo(0, 0);
+
+	CWinApp* pApp = AfxGetApp();
+	ASSERT(pApp != NULL);
+
+	POSITION pos = pApp->GetFirstDocTemplatePosition();
+	while (pos != NULL)
+	{
+		CDocTemplate* pTemplate = (CDocTemplate*)(pApp->GetNextDocTemplate(pos));
+		ASSERT_KINDOF(CDocTemplate, pTemplate);
+
+		POSITION posDoc = pTemplate->GetFirstDocPosition();
+		while (posDoc != NULL)
+		{
+			CalViewerDoc* pDoc = (CalViewerDoc*)(pTemplate->GetNextDoc(posDoc));
+
+			if (pDoc)
+			{
+				if (pDoc->DocMode == 2)
+				{
+					pDoc->OnCloseDocument();
+				}
+			}
+		}
+	}
 }

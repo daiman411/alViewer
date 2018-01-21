@@ -13,7 +13,7 @@
 #include "alViewerView.h"
 #include "MainFrm.h"
 
-#include "alBitmapData.h"
+#include "CalBitmapData.h"
 #include "CDrawCanvas.h"
 #include <math.h>  
 
@@ -50,7 +50,7 @@ END_MESSAGE_MAP()
 CalViewerView::CalViewerView()
 {
 	// TODO: add construction code here
-	m_DrawMode = 2;
+	m_DrawMode = 0;
 	m_Scale = 1.0;
 	m_bMoving = false;
 	m_bScaling = false;
@@ -91,7 +91,7 @@ void CalViewerView::OnDraw(CDC* pDC)
 	// TODO: add draw code for native data here
 	CRect rcClient;
 	this->GetClientRect(&rcClient);
-	COLORREF crRect = RGB(255, 0, 0);
+	COLORREF crRect = RGB(255,0,0);
 
 	// Clear first
 	Rect rcCanvas = CRect2Rect(rcClient);
@@ -101,12 +101,12 @@ void CalViewerView::OnDraw(CDC* pDC)
 	m_pDrawCanvas->DrawImage(pDC->GetSafeHdc(), rcCanvas, CRect2Rect(m_DrawRect), pDoc->ImgBuffer(), pDoc->ImgBitmapInfo());
 
 	// Draw select area
-	if (!m_SelRect.IsRectEmpty())
+	if(!m_SelRect.IsRectEmpty())
 		m_pDrawCanvas->DrawFocusRect(CRect2Rect(m_SelRect), crRect);
 
 	// Draw output text
-	if (!m_strText.IsEmpty())
-		m_pDrawCanvas->DrawStringText(m_strText.GetBuffer(), Rect(0, 0, 200, 100), crRect);
+	if(!m_strText.IsEmpty())
+		m_pDrawCanvas->DrawStringText(m_strText.GetBuffer(), Rect(0,0,200,100), crRect);
 
 	// render it~
 	m_pDrawCanvas->RePaint(pDC->GetSafeHdc(), rcCanvas);
@@ -661,6 +661,18 @@ void CalViewerView::ZoomView_Fit()
 	pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
 }
 
+
+void CalViewerView::UpdateDrawView()
+{
+	CalViewerDoc* pDoc = GetDocument();
+	ASSERT_VALID(pDoc);
+	if (!pDoc)
+		return;
+
+	CRect rcClient(0, 0, 0, 0);
+	GetClientRect(rcClient);
+	m_DrawRect = CalcDrawROI(pDoc, rcClient);
+}
 
 void CalViewerView::OnKillFocus(CWnd* pNewWnd)
 {

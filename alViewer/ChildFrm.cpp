@@ -16,6 +16,7 @@
 IMPLEMENT_DYNCREATE(CChildFrame, CMDIChildWnd)
 
 BEGIN_MESSAGE_MAP(CChildFrame, CMDIChildWnd)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 // CChildFrame construction/destruction
@@ -54,3 +55,13 @@ void CChildFrame::Dump(CDumpContext& dc) const
 #endif //_DEBUG
 
 // CChildFrame message handlers
+
+
+void CChildFrame::OnClose()
+{
+	// TODO: Add your message handler code here and/or call default
+	AfxGetMainWnd()->SendMessage(WM_USER + 301, 0, 0);
+
+
+	CMDIChildWnd::OnClose();
+}

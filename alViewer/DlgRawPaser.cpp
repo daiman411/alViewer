@@ -6,7 +6,7 @@
 #include "alViewerDoc.h"
 #include "DlgRawPaser.h"
 #include "afxdialogex.h"
-#include "alBitmapData.h"
+#include "CalBitmapData.h"
 #include "CDRawCanvas.h"
 
 // CDlgRawPaser dialog
