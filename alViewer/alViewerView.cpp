@@ -158,12 +158,14 @@ CalViewerDoc* CalViewerView::GetDocument() const // non-debug version is inline
 // CalViewerView message handlers
 void CalViewerView::OnInitialUpdate()
 {
-	m_pDrawCanvas = std::unique_ptr<CDrawCanvas>(new CDrawCanvas(this->GetSafeHwnd(), m_DrawMode));
-
 	CalViewerDoc* pDoc = GetDocument();
 	ASSERT_VALID(pDoc);
 	if (!pDoc)
 		return;
+
+	m_DrawMode = pDoc->DocMode == 2 ? 0 : 2; // Video only implement in GDI
+	m_pDrawCanvas = std::unique_ptr<CDrawCanvas>(new CDrawCanvas(this->GetSafeHwnd(), m_DrawMode));
+	
 
 	// TODO: add draw code for native data here
 	CRect rcClient(0, 0, 0, 0);
