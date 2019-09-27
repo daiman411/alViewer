@@ -16,6 +16,7 @@
 IMPLEMENT_DYNCREATE(CChildFrame, CMDIChildWnd)
 
 BEGIN_MESSAGE_MAP(CChildFrame, CMDIChildWnd)
+	ON_WM_CREATE()
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
@@ -34,10 +35,24 @@ CChildFrame::~CChildFrame()
 BOOL CChildFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
 	// TODO: Modify the Window class or styles here by modifying the CREATESTRUCT cs
+	cs.style &= ~WS_MAXIMIZEBOX;
+
 	if( !CMDIChildWnd::PreCreateWindow(cs) )
 		return FALSE;
 
+	cs.style = WS_CHILD | WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU
+			| FWS_ADDTOTITLE | WS_THICKFRAME | WS_MAXIMIZE;
+
 	return TRUE;
+}
+
+// CChildFrame message handlers
+int CChildFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+	if (CMDIChildWnd::OnCreate(lpCreateStruct) == -1)
+		return -1;
+//	ShowWindow(SW_MAXIMIZE);
+	return 0;
 }
 
 // CChildFrame diagnostics

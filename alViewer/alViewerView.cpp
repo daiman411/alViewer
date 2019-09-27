@@ -50,7 +50,7 @@ END_MESSAGE_MAP()
 CalViewerView::CalViewerView()
 {
 	// TODO: add construction code here
-	m_DrawMode = 0;
+	m_DrawMode = 2;
 	m_Scale = 1.0;
 	m_bMoving = false;
 	m_bScaling = false;
@@ -91,25 +91,29 @@ void CalViewerView::OnDraw(CDC* pDC)
 	// TODO: add draw code for native data here
 	CRect rcClient;
 	this->GetClientRect(&rcClient);
-	COLORREF crRect = RGB(255,0,0);
+	COLORREF crPen = RGB(255,0,0);
 
 	// Clear first
-	Rect rcCanvas = CRect2Rect(rcClient);
-	m_pDrawCanvas->ClearDraw(rcCanvas);
+	if (m_pDrawCanvas)
+	{
+		Rect rcCanvas = CRect2Rect(rcClient);
+		m_pDrawCanvas->ClearDraw(rcCanvas);
 
-	// Draw to buffer
-	m_pDrawCanvas->DrawImage(pDC->GetSafeHdc(), rcCanvas, CRect2Rect(m_DrawRect), pDoc->ImgBuffer(), pDoc->ImgBitmapInfo());
+		// Draw to buffer
+		m_pDrawCanvas->DrawImage(pDC->GetSafeHdc(), rcCanvas, CRect2Rect(m_DrawRect), pDoc->ImgBuffer(), pDoc->ImgBitmapInfo(), pDoc->ClearBuffer);
+		pDoc->ClearBuffer = false;
 
-	// Draw select area
-	if(!m_SelRect.IsRectEmpty())
-		m_pDrawCanvas->DrawFocusRect(CRect2Rect(m_SelRect), crRect);
+		// Draw select area
+		if (!m_SelRect.IsRectEmpty())
+			m_pDrawCanvas->DrawFocusRect(CRect2Rect(m_SelRect), crPen);
 
-	// Draw output text
-	if(!m_strText.IsEmpty())
-		m_pDrawCanvas->DrawStringText(m_strText.GetBuffer(), Rect(0,0,200,100), crRect);
+		// Draw output text
+		if (!m_strText.IsEmpty())
+			m_pDrawCanvas->DrawStringText(m_strText.GetBuffer(), Rect(0, 0, 200, 100), crPen);
 
-	// render it~
-	m_pDrawCanvas->RePaint(pDC->GetSafeHdc(), rcCanvas);
+		// render it~
+		m_pDrawCanvas->RePaint(pDC->GetSafeHdc(), rcCanvas);
+	}
 
 	pDoc->UpdateStatusRatio(m_Scale);
 }
@@ -163,9 +167,9 @@ void CalViewerView::OnInitialUpdate()
 	if (!pDoc)
 		return;
 
-	m_DrawMode = pDoc->DocMode == 2 ? 0 : 2; // Video only implement in GDI
-	m_pDrawCanvas = std::unique_ptr<CDrawCanvas>(new CDrawCanvas(this->GetSafeHwnd(), m_DrawMode));
-	
+	m_DrawMode = pDoc->DocMode == 2 ? 0 : 2;
+	m_pDrawCanvas = std::unique_ptr<CDrawCanvas>(new CDrawCanvas(this->GetSafeHwnd(), 3));
+
 
 	// TODO: add draw code for native data here
 	CRect rcClient(0, 0, 0, 0);
@@ -293,12 +297,27 @@ CPoint CalViewerView::ImagePtFromPB(CPoint &pt, CRect &rcDraw, int w , int h)
 {
 	CPoint retPt(0, 0);
 	int posX(0), posY(0);
-	Float2Int( (pt.x - rcDraw.TopLeft().x) / (float)rcDraw.Width() * w , posX);
-	Float2Int( (pt.y - rcDraw.TopLeft().y) / (float)rcDraw.Height() * h , posY);
-	retPt.x = posX;
+    Float2Int(((pt.x - rcDraw.TopLeft().x) / (float)rcDraw.Width() * w)  , posX);
+	Float2Int(((pt.y - rcDraw.TopLeft().y) / (float)rcDraw.Height() * h) , posY);
+
+    retPt.x = posX;
 	retPt.y = posY;
 
 	return retPt;
+}
+
+
+CPoint CalViewerView::ImageUPtFromPB(CPoint &pt, CRect &rcDraw, int w, int h)
+{
+    CPoint retPt(0, 0);
+    int posX(0), posY(0);
+    Float2Int(floor((pt.x - rcDraw.TopLeft().x) / (float)rcDraw.Width() * w), posX);
+    Float2Int(floor((pt.y - rcDraw.TopLeft().y) / (float)rcDraw.Height() * h), posY);
+
+    retPt.x = posX;
+    retPt.y = posY;
+
+    return retPt;
 }
 
 CPoint CalViewerView::PBPtFromImage(CPoint &pt, CRect &rcDraw, int w, int h)
@@ -365,30 +384,35 @@ void CalViewerView::OnMouseMove(UINT nFlags, CPoint point)
 		m_Offset.y += dy;
 		m_DrawRect.OffsetRect(dx, dy);
 		m_SelRect = PBRectFromImage(m_ImgRect, m_DrawRect, width, height);
+		Invalidate(FALSE);
 	}
 	else if (m_bSelecting)
 	{
 		m_pTmpRect->SetRect(m_OldPos.x, m_OldPos.y, point.x, point.y);
 		m_pTmpRect->NormalizeRect();
 		m_ImgRect = ImageRectFromPB(*m_pTmpRect, m_DrawRect, pDoc->ImgWidth(), pDoc->ImgHeight());
+		Invalidate(FALSE);
 	}
 
 	if (m_DrawRect.PtInRect(point))
 	{
 		int width = pDoc->ImgWidth();
 		int height = pDoc->ImgHeight();
-		CPoint pt = ImagePtFromPB(point, m_DrawRect, width, height);
-		PIXEL_DATA RGB = pDoc->BmpData()->GetPixel(pt.x, pt.y);
-		BYTE R = RGB.R;
-		BYTE G = RGB.G;
-		BYTE B = RGB.B;
 
-		pDoc->UpdateStatusPos(pt.x, pt.y);
-		pDoc->UpdateStatusRGB(R, G, B);
-		pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+		if (width && height)
+		{
+		    CPoint pt = ImageUPtFromPB(point, m_DrawRect, width, height);
+		    PIXEL_DATA RGB = pDoc->BmpData()->GetPixel(pt.x, pt.y);
+		    BYTE R = RGB.R;
+		    BYTE G = RGB.G;
+		    BYTE B = RGB.B;
+
+		    pDoc->UpdateStatusPos(pt.x, pt.y);
+		    pDoc->UpdateStatusRGB(R, G, B);
+		    pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+		}
 	}
 
-	Invalidate(FALSE);
 
 	CView::OnMouseMove(nFlags, point);
 }
@@ -410,6 +434,7 @@ void CalViewerView::OnMButtonDown(UINT nFlags, CPoint point)
 	int width = pDoc->ImgWidth();
 	int height = pDoc->ImgHeight();
 
+	//pDoc->ClearBitmapImage();
 	// Reset draw image
 	m_DrawRect = CalcDrawROI(pDoc, rcClient);
 	m_SelRect = PBRectFromImage(m_ImgRect, m_DrawRect, width, height);
@@ -450,6 +475,7 @@ void CalViewerView::OnSize(UINT nType, int cx, int cy)
 
 	m_DrawRect = CalcDrawROI(pDoc, rcClient);
 	m_SelRect = PBRectFromImage(m_ImgRect, m_DrawRect, width, height);
+    if (m_pDrawCanvas) { m_pDrawCanvas->UpdateWindowSize(); }
 }
 
 
@@ -468,6 +494,7 @@ void CalViewerView::OnSizing(UINT fwSide, LPRECT pRect)
 	// TODO: Add your message handler code here
 	m_DrawRect = CalcDrawROI(pDoc, CRect(pRect));
 	m_SelRect = PBRectFromImage(m_ImgRect, m_DrawRect, width, height);
+    if (m_pDrawCanvas) { m_pDrawCanvas->UpdateWindowSize(); }
 }
 
 
@@ -525,9 +552,20 @@ void CalViewerView::OnLButtonUp(UINT nFlags, CPoint point)
 					m_ImgRect = ImageRectFromPB(*m_pTmpRect, m_DrawRect, pDoc->ImgWidth(), pDoc->ImgHeight());
 
 					// Calculate mean value
-					PIXEL_STAT stat_mean = pDoc->BmpData()->GetMean(m_ImgRect);
+					PIXEL_STAT stat_mean = pDoc->BmpData()->GetSTAT(m_ImgRect);
 					m_strText.Format(_T("R mean: %.3f\r\nGr mean: %.3f\r\nGb mean: %.3f\r\nB mean: %.3f\r\n"),
 						stat_mean.R_Mean, stat_mean.Gr_Mean, stat_mean.Gb_Mean, stat_mean.B_Mean);
+
+                    CString strMax;
+                    strMax.Format(_T("\r\nR max: %.3f\r\nGr max: %.3f\r\nGb max: %.3f\r\nB max: %.3f\r\n"),
+                        stat_mean.R_Max, stat_mean.Gr_Max, stat_mean.Gb_Max, stat_mean.B_Max);
+
+                    CString strMin;
+                    strMin.Format(_T("\r\nR min: %.3f\r\nGr min: %.3f\r\nGb min: %.3f\r\nB min: %.3f\r\n"),
+                        stat_mean.R_Min, stat_mean.Gr_Min, stat_mean.Gb_Min, stat_mean.B_Min);
+
+                    m_strText.Append(strMax);
+                    m_strText.Append(strMin);
 				}
 
 				m_pTmpRect = nullptr;
@@ -558,7 +596,6 @@ void CalViewerView::OnRButtonUp(UINT nFlags, CPoint point)
 
 	CScrollView::OnRButtonUp(nFlags, point);
 }
-
 
 void CalViewerView::ZoomView(short zDelta, bool cursor)
 {
@@ -663,6 +700,27 @@ void CalViewerView::ZoomView_Fit()
 	pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
 }
 
+void CalViewerView::MoveNextOne()
+{
+	CalViewerDoc* pDoc = GetDocument();
+	ASSERT_VALID(pDoc);
+	if (!pDoc)
+		return;
+
+	pDoc->MoveToNextImage();
+	Invalidate(FALSE);
+}
+
+void CalViewerView::MovePrvousOne()
+{
+	CalViewerDoc* pDoc = GetDocument();
+	ASSERT_VALID(pDoc);
+	if (!pDoc)
+		return;
+
+	pDoc->MoveToPreImage();
+	Invalidate(FALSE);
+}
 
 void CalViewerView::UpdateDrawView()
 {
@@ -699,4 +757,129 @@ void CalViewerView::OnMouseLeave()
 Rect CalViewerView::CRect2Rect(CRect &rc)
 {
 	return Rect(rc.left, rc.top, rc.Width(), rc.Height());
+}
+
+
+BOOL CalViewerView::PreTranslateMessage(MSG* pMsg)
+{
+	//  TODO:  Add  your  specialized  code  here  and/or  call  the  base  class
+	if (pMsg->message == WM_KEYDOWN || pMsg->message == WM_SYSKEYDOWN)
+	{
+		switch (pMsg->wParam)
+		{
+		case _T('S'):
+		{
+			CTime ct;
+			ct = CTime::GetCurrentTime();
+			CString strDate = ct.Format(_T("_%Y%m%d-%H%M%S"));
+			int nRawImageSize = 0;
+
+			CalViewerDoc* doc = (CalViewerDoc*)this->GetDocument();
+			CString loadPicName = doc->ImagePath();
+			CString savePicPath = loadPicName.Mid(0, loadPicName.ReverseFind(_T('.')));
+			savePicPath.Append(strDate);
+			savePicPath += _T(".png");
+			doc->SaveImageFile(savePicPath);
+		}
+		break;
+
+		case _T('A'):
+		{
+			if (GetKeyState(VK_CONTROL) != 0)
+			{
+				UpdateDrawView();
+				CalViewerDoc* pDoc = (CalViewerDoc*)this->GetDocument();
+
+				CRect wholeImage = CRect(0, 0, pDoc->ImgWidth(), pDoc->ImgHeight());			   			
+				m_SelRect = PBRectFromImage(wholeImage, m_DrawRect, pDoc->ImgWidth(), pDoc->ImgHeight());
+				m_ImgRect = wholeImage;
+
+				// Calculate mean value
+				PIXEL_STAT stat_mean = pDoc->BmpData()->GetSTAT(wholeImage);
+				m_strText.Format(_T("R mean: %.3f\r\nGr mean: %.3f\r\nGb mean: %.3f\r\nB mean: %.3f\r\n"),
+					stat_mean.R_Mean, stat_mean.Gr_Mean, stat_mean.Gb_Mean, stat_mean.B_Mean);
+
+                CString strMax;
+                strMax.Format(_T("\r\nR max: %.3f\r\nGr max: %.3f\r\nGb max: %.3f\r\nB max: %.3f\r\n"),
+                    stat_mean.R_Max, stat_mean.Gr_Max, stat_mean.Gb_Max, stat_mean.B_Max);
+
+                CString strMin;
+                strMin.Format(_T("\r\nR min: %.3f\r\nGr min: %.3f\r\nGb min: %.3f\r\nB min: %.3f\r\n"),
+                    stat_mean.R_Min, stat_mean.Gr_Min, stat_mean.Gb_Min, stat_mean.B_Min);
+
+                m_strText.Append(strMax);
+                m_strText.Append(strMin);
+
+				Invalidate(FALSE);
+				pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+			}
+		}
+		break;
+
+        case _T('X'):
+        {
+            if (GetKeyState(VK_CONTROL) != 0)
+            {
+                CTime ct;
+                ct = CTime::GetCurrentTime();
+                CString strDate = ct.Format(_T("_%Y%m%d-%H%M%S"));
+                int nRawImageSize = 0;
+
+                CalViewerDoc* doc = (CalViewerDoc*)this->GetDocument();
+                CString loadPicName = doc->ImagePath();
+                CString savePicPath = loadPicName.Mid(0, loadPicName.ReverseFind(_T('.')));
+                savePicPath.Append(strDate);
+                savePicPath += _T(".bin");
+                doc->SaveRawDataFile(savePicPath);
+            }
+        }
+        break;
+
+        case _T('M'):
+        {
+            if (GetKeyState(VK_CONTROL) != 0)
+            {
+                UpdateDrawView();
+                CalViewerDoc* pDoc = (CalViewerDoc*)this->GetDocument();
+                pDoc->ExecuteImgProc(110);
+
+                Invalidate(FALSE);
+                pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+            }
+        }
+        break;
+
+        case _T('F'):
+        {
+            if (GetKeyState(VK_CONTROL) != 0)
+            {
+                UpdateDrawView();
+                CalViewerDoc* pDoc = (CalViewerDoc*)this->GetDocument();
+                pDoc->ExecuteImgProc(111);
+
+                Invalidate(FALSE);
+                pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+            }
+        }
+        break;
+
+        case _T('R'):
+        {
+            if (GetKeyState(VK_CONTROL) != 0)
+            {
+                UpdateDrawView();
+                CalViewerDoc* pDoc = (CalViewerDoc*)this->GetDocument();
+                pDoc->ExecuteImgProc(100);
+
+                //Fit to view size
+                ZoomView_Fit();
+                Invalidate(FALSE);
+                pDoc->UpdateStatusRect(m_ImgRect.left, m_ImgRect.top, m_ImgRect.Width(), m_ImgRect.Height());
+            }
+        }
+        break;
+		}
+	}
+
+	return  CView::PreTranslateMessage(pMsg);
 }

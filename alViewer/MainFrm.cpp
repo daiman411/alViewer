@@ -4,10 +4,10 @@
 
 #include "stdafx.h"
 #include "alViewer.h"
-
 #include "MainFrm.h"
 #include "alViewerView.h"
 #include "alViewerDoc.h"
+#include "DlgHistogram.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -40,12 +40,20 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWnd)
 	ON_COMMAND(ID_VIEWER_ZOOMOUT, &CMainFrame::OnViewerZoomout)
 	ON_COMMAND(ID_VIEWER_ZOOMFIT, &CMainFrame::OnViewerZoomfit)
 	ON_UPDATE_COMMAND_UI(ID_VIEWER_ZOOMFIT, &CMainFrame::OnUpdateViewerZoomfit)
+	ON_COMMAND(ID_VIEWER_PREONE, &CMainFrame::OnViewerPreOne)
+	ON_UPDATE_COMMAND_UI(ID_VIEWER_PREONE, &CMainFrame::OnUpdateViewerPreOne)
+	ON_COMMAND(ID_VIEWER_NEXTONE, &CMainFrame::OnViewerNextOne)
+	ON_UPDATE_COMMAND_UI(ID_VIEWER_NEXTONE, &CMainFrame::OnUpdateViewerNextOne)
+
 	ON_WM_SIZING()
 	ON_WM_SIZE()
 	ON_UPDATE_COMMAND_UI(ID_PREVIEWE_START, &CMainFrame::OnUpdatePrevieweStart)
 	ON_COMMAND(ID_PREVIEWE_START, &CMainFrame::OnPrevieweStart)
 	ON_UPDATE_COMMAND_UI(ID_PREVIEWE_STOP, &CMainFrame::OnUpdatePrevieweStop)
 	ON_COMMAND(ID_PREVIEWE_STOP, &CMainFrame::OnPrevieweStop)
+	ON_COMMAND(ID_VIEW_SHOW_HIST, &CMainFrame::OnViewShowHist)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_SHOW_HIST, &CMainFrame::OnUpdateViewShowHist)
+    ON_COMMAND_EX(ID_WINDOW_ARRANGE, &CMainFrame::OnWindowCommand)
 END_MESSAGE_MAP()
 
 static UINT indicators[] =
@@ -117,7 +125,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	EnableDocking(CBRS_ALIGN_ANY);
 	DockControlBar(&m_wndToolBar);
 	DockControlBarLeftOf(&m_wndVideoBar, &m_wndToolBar);
-	
+
 	return 0;
 }
 
@@ -260,7 +268,7 @@ LRESULT CMainFrame::OnStopPreviewVideo(WPARAM wParam, LPARAM lParam)
 LRESULT CMainFrame::OnEnableToolbarStatus(WPARAM wParam, LPARAM lParam)
 {
 	m_bEnableToolbar = true;
-	OnViewerArrow();
+	OnViewerSelect();
 	return 0;
 }
 
@@ -285,8 +293,8 @@ void CMainFrame::OnViewerArrow()
 {
 	// TODO: Add your command handler code here
 	m_ToolBarFunc = TOOL_FUNC_ARROW;
-	m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_ARROW);
-	m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_SELECT, false);
+	//m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_ARROW);
+	//m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_SELECT, false);
 }
 
 
@@ -301,8 +309,8 @@ void CMainFrame::OnViewerSelect()
 {
 	// TODO: Add your command handler code here
 	m_ToolBarFunc = TOOL_FUNC_SELECT;
-	m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_SELECT);
-	m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_ARROW, false);
+	//m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_SELECT);
+	//m_wndToolBar.GetToolBarCtrl().PressButton(ID_VIEWER_ARROW, false);
 }
 
 void CMainFrame::OnFileOpen()
@@ -375,6 +383,29 @@ void CMainFrame::OnViewerZoomfit()
 	}
 }
 
+void CMainFrame::OnViewerPreOne()
+{
+	// TODO: Add your command handler code here
+	CMDIChildWnd* pChildWnd = MDIGetActive();
+
+	if (pChildWnd)
+	{
+		CalViewerView* pMainView = static_cast<CalViewerView*>(pChildWnd->GetActiveView());
+		pMainView->MovePrvousOne();
+	}
+}
+
+void CMainFrame::OnViewerNextOne()
+{
+	// TODO: Add your command handler code here
+	CMDIChildWnd* pChildWnd = MDIGetActive();
+
+	if (pChildWnd)
+	{
+		CalViewerView* pMainView = static_cast<CalViewerView*>(pChildWnd->GetActiveView());
+		pMainView->MoveNextOne();
+	}
+}
 
 void CMainFrame::OnUpdateViewerZoomfit(CCmdUI *pCmdUI)
 {
@@ -382,6 +413,17 @@ void CMainFrame::OnUpdateViewerZoomfit(CCmdUI *pCmdUI)
 	pCmdUI->Enable(m_bEnableToolbar);
 }
 
+void CMainFrame::OnUpdateViewerPreOne(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
+	pCmdUI->Enable(TRUE);
+}
+
+void CMainFrame::OnUpdateViewerNextOne(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
+	pCmdUI->Enable(TRUE);
+}
 
 void CMainFrame::OnSizing(UINT fwSide, LPRECT pRect)
 {
@@ -427,8 +469,14 @@ void CMainFrame::OnPrevieweStart()
 	// TODO: Add your command handler code here
 	CWinApp* pApp = AfxGetApp();
 	ASSERT(pApp != NULL);
-	CString fileName = _T("C:\\Video.UVC");
-	pApp->OpenDocumentFile(fileName.GetBuffer(), FALSE);
+
+	if (GetDocument() == nullptr)
+		pApp->OpenDocumentFile(_T("C:\\Video.UVC"), FALSE);
+	else
+	{
+		CalViewerDoc* pMainDoc = static_cast<CalViewerDoc*>(GetDocument());
+		pMainDoc->StartPreviewThread();
+	}
 }
 
 void CMainFrame::OnUpdatePrevieweStop(CCmdUI *pCmdUI)
@@ -465,4 +513,102 @@ void CMainFrame::OnPrevieweStop()
 			}
 		}
 	}
+}
+
+void CMainFrame::OnViewShowHist()
+{
+	CDlgHistogram *dlgHist = nullptr;
+	//dlgHist.DoModal();
+
+	if (dlgHist == nullptr)
+	{
+		CString strPropertiesWnd;
+		//BOOL bNameValid = strPropertiesWnd.LoadString(IDS_PROPERTIES_WND);
+		//ASSERT(bNameValid);
+
+		dlgHist = new CDlgHistogram();
+
+		if (!dlgHist->Create(strPropertiesWnd, this, CRect(0, 0, 200, 200), FALSE, IDD_DIALOG_HISTOGRAM, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | CBRS_LEFT | CBRS_FLOAT_MULTI))
+		{
+			TRACE0("Failed to create Properties window\n");
+			return; // failed to create
+		}
+		dlgHist->EnableDocking(CBRS_ALIGN_ANY);
+//		DockPane(dlgHist);
+		dlgHist->ShowPane(TRUE, FALSE, TRUE);
+		//m_wndFocusAdjPanel->StartAdjustFocus();
+		//m_bIsButtonPushingDown = TRUE;
+	}
+	else
+	{
+		if (dlgHist->IsPaneVisible())
+		{
+			//m_bIsButtonPushingDown = FALSE;
+			//m_wndFocusAdjPanel->StopAdjustFocus();
+			dlgHist->ShowPane(FALSE, FALSE, FALSE);
+		}
+		else
+		{
+			//m_bIsButtonPushingDown = TRUE;
+			dlgHist->ShowPane(TRUE, FALSE, TRUE);
+			//m_wndFocusAdjPanel->StartAdjustFocus();
+		}
+	}
+}
+
+CDocument* CMainFrame::GetDocument()
+{
+	CWinApp* pApp = AfxGetApp();
+	ASSERT(pApp != NULL);
+
+	POSITION pos = pApp->GetFirstDocTemplatePosition();
+	while (pos != NULL)
+	{
+		CDocTemplate* pTemplate = (CDocTemplate*)(pApp->GetNextDocTemplate(pos));
+		ASSERT_KINDOF(CDocTemplate, pTemplate);
+
+		POSITION posDoc = pTemplate->GetFirstDocPosition();
+		while (posDoc != NULL)
+		{
+			CalViewerDoc* pDoc = (CalViewerDoc*)(pTemplate->GetNextDoc(posDoc));
+
+			if (pDoc)
+			{
+				return pDoc;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+
+void CMainFrame::OnUpdateViewShowHist(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
+	pCmdUI->Enable(TRUE);
+}
+
+BOOL CMainFrame::OnWindowCommand(UINT nID)
+{
+    switch (nID)
+    {
+    case ID_WINDOW_ARRANGE: // For Window\Arrange Icons menu item, arrange
+        MDIIconArrange();    // all minimized document child windows.
+        break;
+
+    case ID_WINDOW_CASCADE: // For Window\Cascade menu item, arrange
+        MDICascade();        // all the MDI child windows in a cascade format.
+        break;
+
+    case ID_WINDOW_TILE_HORZ:       // For Window\Tile Horizontal menu item,
+        MDITile(MDITILE_HORIZONTAL); // tile MDI child windows so that
+        break;                       // one window appears above another.
+
+    case ID_WINDOW_TILE_VERT:     // For Window\Tile Vertical menu item,
+        MDITile(MDITILE_VERTICAL); // tile MDI child windows so that
+        break;                     // one window appears beside another.
+    }
+
+    return TRUE;
 }

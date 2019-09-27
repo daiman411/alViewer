@@ -20,6 +20,7 @@ CDlgRawPaser::CDlgRawPaser(CWnd* pParent /*=NULL*/)
 	m_height = 480;
 	m_header = 0;
 	m_stride = -1;
+    m_blvClamp = 0;
 	m_format = 0;
 	m_colorOrder = 0;
 	m_bInitDone = false;
@@ -34,6 +35,7 @@ CDlgRawPaser::CDlgRawPaser(CWnd* pParent, CDocument* pDoc)
 	m_height = 480;
 	m_header = 0;
 	m_stride = -1;
+    m_blvClamp = 0;
 	m_format = 0;
 	m_colorOrder = 0;
 	m_ImgPath.Empty();
@@ -49,16 +51,17 @@ CDlgRawPaser::~CDlgRawPaser()
 
 void CDlgRawPaser::DoDataExchange(CDataExchange* pDX)
 {
-	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_EDIT_RAW_W, m_tbWidth);
-	DDX_Control(pDX, IDC_EDIT_RAW_H, m_tbHeight);
-	DDX_Control(pDX, IDC_EDIT_HEADER_SIZE, m_tbHeader);
-	DDX_Control(pDX, IDC_CK_RGGB, m_ck_RGGB);
-	DDX_Control(pDX, IDC_CK_GRBG, m_ck_GRBG);
-	DDX_Control(pDX, IDC_CK_GBRG, m_ck_GBRG);
-	DDX_Control(pDX, IDC_CK_BGGR, m_ck_BGGR);
-	DDX_Control(pDX, IDC_CMB_IMG_FORMAT, m_cb_ImageFormat);
-	DDX_Control(pDX, IDC_EDIT_STRIDE, m_tbStride);
+    CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_EDIT_RAW_W, m_tbWidth);
+    DDX_Control(pDX, IDC_EDIT_RAW_H, m_tbHeight);
+    DDX_Control(pDX, IDC_EDIT_HEADER_SIZE, m_tbHeader);
+    DDX_Control(pDX, IDC_CK_RGGB, m_ck_RGGB);
+    DDX_Control(pDX, IDC_CK_GRBG, m_ck_GRBG);
+    DDX_Control(pDX, IDC_CK_GBRG, m_ck_GBRG);
+    DDX_Control(pDX, IDC_CK_BGGR, m_ck_BGGR);
+    DDX_Control(pDX, IDC_CMB_IMG_FORMAT, m_cb_ImageFormat);
+    DDX_Control(pDX, IDC_EDIT_STRIDE, m_tbStride);
+    DDX_Control(pDX, IDC_EDIT_BLACKLV, m_tbBLVClamp);
 }
 
 
@@ -75,6 +78,7 @@ BEGIN_MESSAGE_MAP(CDlgRawPaser, CDialogEx)
 	ON_EN_CHANGE(IDC_EDIT_RAW_H, &CDlgRawPaser::OnEnChangeEditRawH)
 	ON_EN_CHANGE(IDC_EDIT_HEADER_SIZE, &CDlgRawPaser::OnEnChangeEditHeaderSize)
 	ON_EN_CHANGE(IDC_EDIT_STRIDE, &CDlgRawPaser::OnEnChangeEditStride)
+    ON_EN_CHANGE(IDC_EDIT_BLACKLV, &CDlgRawPaser::OnEnChangeEditBlacklv)
 END_MESSAGE_MAP()
 
 
@@ -103,6 +107,9 @@ BOOL CDlgRawPaser::OnInitDialog()
 	tmp.Format(_T("%d"), m_stride);
 	m_tbStride.SetWindowText(tmp);
 
+    tmp.Format(_T("%d"), m_blvClamp);
+    m_tbBLVClamp.SetWindowText(tmp);
+
 	m_tbHeader.SetWindowText(_T("0"));
 	m_cb_ImageFormat.SetCurSel(m_format);
 	m_ck_RGGB.SetCheck(BST_CHECKED);
@@ -116,6 +123,7 @@ BOOL CDlgRawPaser::OnInitDialog()
 	format_pk.RAW_HEADER = m_header;
 	format_pk.RAW_FORMAT = ConvertRawFormat(m_format);;
 	format_pk.RAW_STRIDE = m_stride;
+    format_pk.RAW_BLACKLV = m_blvClamp;
 	format_pk.RAW_CR_ORDER = m_colorOrder;
 
 	if (!m_pMainDoc->BmpData()->LoadRAWFile(m_ImgPath.GetBuffer(), format_pk))
@@ -337,12 +345,12 @@ void CDlgRawPaser::OnEnChangeEditStride()
 		m_tbStride.GetWindowText(strTmp);
 		m_stride = _ttoi(strTmp.GetBuffer());
 
-		ReloadRawFileData(m_bReloadFile);
+		ReloadRawFileData(m_bReloadFile, false);
 		Invalidate();
 	}
 }
 
-void CDlgRawPaser::ReloadRawFileData(bool bReload)
+void CDlgRawPaser::ReloadRawFileData(bool bReload, bool bUpdateStride)
 {
 	if (bReload)
 	{
@@ -353,8 +361,9 @@ void CDlgRawPaser::ReloadRawFileData(bool bReload)
 		format_pk.RAW_FORMAT = ConvertRawFormat(m_format);
 		format_pk.RAW_STRIDE = m_stride;
 		format_pk.RAW_CR_ORDER = m_colorOrder;
+        format_pk.RAW_BLACKLV = m_blvClamp;
 
-		if (!m_pMainDoc->BmpData()->LoadRAWFile(m_ImgPath.GetBuffer(), format_pk))
+        if (!m_pMainDoc->BmpData()->LoadRAWFile(m_ImgPath.GetBuffer(), format_pk))
 		{
 			AfxMessageBox(_T("Can't paser raw data"));
 		}
@@ -362,9 +371,13 @@ void CDlgRawPaser::ReloadRawFileData(bool bReload)
 		m_bReloadFile = false;
 		m_stride = format_pk.RAW_PITCHOUT;
 
-		CString tmp;
-		tmp.Format(_T("%d"), m_stride);
-		m_tbStride.SetWindowText(tmp);
+		if (bUpdateStride)
+		{
+			CString tmp;
+			tmp.Format(_T("%d"), m_stride);
+			m_tbStride.SetWindowText(tmp);
+		}
+
 		m_bReloadFile = true;
 	}
 }
@@ -391,44 +404,93 @@ int CDlgRawPaser::GetStride()
 
 int CDlgRawPaser::GetFormat() 
 { 
-	switch (m_format)
-	{
-	case 0:
-		return RAW_8BITS;
-		break;
+    int raw_format = RAW_8BITS;
 
-	case 1:
-		return RAW_16BITS;
-		break;
+    switch (m_format)
+    {
+    case 0:
+        raw_format = Y_RAW_8BITS;
+        break;
 
-	case 2:
-		return RAW_MIPI_8BITS;
-		break;
+    case 1:
+        raw_format = Y_RAW_10BITS;
+        break;
 
-	case 3:
-		return RAW_MIPI_10BITS;
-		break;
+    case 2:
+        raw_format = Y_RAW_12BITS;
+        break;
 
-	case 4:
-		return RAW_MIPI_12BITS;
-		break;
+    case 3:
+        raw_format = Y_RAW_14BITS;
+        break;
 
-	case 5:
-		return RAW_QCOMM_8BITS;
-		break;
+    case 4:
+        raw_format = Y_RAW_16BITS;
+        break;
 
-	case 6:
-		return RAW_QCOMM_10BITS;
-		break;
+    case 5:
+        raw_format = RAW_8BITS;
+        break;
 
-	case 7:
-		return RAW_QCOMM_12BITS;
-		break;
+    case 6:
+        raw_format = RAW_8BITS_NoCFAi;
+        break;
 
-	default:
-		return RAW_8BITS;
-		break;
-	}
+    case 7:
+        raw_format = RAW_10BITS;
+        break;
+
+    case 8:
+        raw_format = RAW_12BITS;
+        break;
+
+    case 9:
+        raw_format = RAW_14BITS;
+        break;
+
+    case 10:
+        raw_format = RAW_16BITS;
+        break;
+
+    case 11:
+        raw_format = RAW_16BITS_A;
+        break;
+
+    case 12:
+        raw_format = RAW_16BITS_NoCFAi;
+        break;
+
+    case 13:
+        raw_format = RAW_MIPI_8BITS;
+        break;
+
+    case 14:
+        raw_format = RAW_MIPI_10BITS;
+        break;
+
+    case 15:
+        raw_format = RAW_MIPI_12BITS;
+        break;
+
+    case 16:
+        raw_format = RAW_QCOMM_8BITS;
+        break;
+
+    case 17:
+        raw_format = RAW_QCOMM_10BITS;
+        break;
+
+    case 18:
+        raw_format = RAW_QCOMM_12BITS;
+        break;
+
+    default:
+        raw_format = RAW_8BITS;
+        break;
+    }
+
+    return raw_format;
+
 }
 
 int CDlgRawPaser::GetColorOrder() 
@@ -454,40 +516,83 @@ void CDlgRawPaser::SetHeight(int h)
 }
 
 void CDlgRawPaser::SetFormat(int format) 
-{ 
-
+{   
 	switch (format)
 	{
-	case RAW_8BITS:
-		m_format = 0;
-		break;
+    case Y_RAW_8BITS:
+        m_format = 0;
+        break;
+
+    case Y_RAW_10BITS:
+        m_format = 1;
+        break;
+
+    case Y_RAW_12BITS:
+        m_format = 2;
+        break;
+
+    case Y_RAW_14BITS:
+        m_format = 3;
+        break;
+
+    case Y_RAW_16BITS:
+        m_format = 4;
+        break;
+
+    case RAW_8BITS:
+        m_format = 5;
+        break;
+
+    case RAW_8BITS_NoCFAi:
+        m_format = 6;
+        break;
+
+    case RAW_10BITS:
+        m_format = 7;
+        break;
+
+    case RAW_12BITS:
+        m_format = 8;
+        break;
+
+    case RAW_14BITS:
+        m_format = 9;
+        break;
 
 	case RAW_16BITS:
-		m_format = 1;
+		m_format = 10;
 		break;
 
+    case RAW_16BITS_A:
+        m_format = 11;
+        break;
+
+    case RAW_16BITS_NoCFAi:
+        m_format = 12;
+        break;
+
 	case RAW_MIPI_8BITS:
-		m_format = 2;
+		m_format = 13;
 		break;
 
 	case RAW_MIPI_10BITS:
-		m_format = 3;
+		m_format = 14;
 		break;
 
 	case RAW_MIPI_12BITS:
-		m_format = 4;
+		m_format = 15;
 		break;
 
 	case RAW_QCOMM_8BITS:
-		m_format = 5;
+		m_format = 16;
 		break;
 
 	case RAW_QCOMM_10BITS:
-		m_format = 6;
+		m_format = 17;
 		break;
 
 	case RAW_QCOMM_12BITS:
-		m_format = 7;
+		m_format = 18;
 		break;
 	}
 
@@ -500,34 +605,78 @@ int CDlgRawPaser::ConvertRawFormat(int index)
 	switch (index)
 	{
 	case 0:
-		raw_format = RAW_8BITS;
+		raw_format = Y_RAW_8BITS;
 		break;
 
 	case 1:
-		raw_format = RAW_16BITS;
+		raw_format = Y_RAW_10BITS;
 		break;
 
 	case 2:
-		raw_format = RAW_MIPI_8BITS;
+		raw_format = Y_RAW_12BITS;
 		break;
 
 	case 3:
-		raw_format = RAW_MIPI_10BITS;
+		raw_format = Y_RAW_14BITS;
 		break;
 
 	case 4:
-		raw_format = RAW_MIPI_12BITS;
+		raw_format = Y_RAW_16BITS;
 		break;
 
 	case 5:
+		raw_format = RAW_8BITS;
+		break;
+
+    case 6:
+        raw_format = RAW_8BITS_NoCFAi;
+        break;
+
+    case 7:
+        raw_format = RAW_10BITS;
+        break;
+
+    case 8:
+        raw_format = RAW_12BITS;
+        break;
+
+    case 9:
+        raw_format = RAW_14BITS;
+        break;
+
+    case 10:
+        raw_format = RAW_16BITS;
+        break;
+
+    case 11:
+        raw_format = RAW_16BITS_A;
+        break;
+
+    case 12:
+        raw_format = RAW_16BITS_NoCFAi;
+        break;
+
+	case 13:
+		raw_format = RAW_MIPI_8BITS;
+		break;
+
+	case 14:
+		raw_format = RAW_MIPI_10BITS;
+		break;
+
+	case 15:
+		raw_format = RAW_MIPI_12BITS;
+		break;
+
+	case 16:
 		raw_format = RAW_QCOMM_8BITS;
 		break;
 
-	case 6:
+	case 17:
 		raw_format = RAW_QCOMM_10BITS;
 		break;
 
-	case 7:
+	case 18:
 		raw_format = RAW_QCOMM_12BITS;
 		break;
 
@@ -552,4 +701,24 @@ ULONGLONG CDlgRawPaser::QueryFileSize(CString rawPath)
 	File.Close();
 
 	return rawFileSize;
+}
+
+void CDlgRawPaser::OnEnChangeEditBlacklv()
+{
+    // TODO:  If this is a RICHEDIT control, the control will not
+    // send this notification unless you override the CDialogEx::OnInitDialog()
+    // function and call CRichEditCtrl().SetEventMask()
+    // with the ENM_CHANGE flag ORed into the mask.
+
+    // TODO:  Add your control notification handler code here
+    if (m_bInitDone)
+    {
+        CString strTmp;
+        m_tbBLVClamp.GetWindowText(strTmp);
+        m_blvClamp = _ttoi(strTmp.GetBuffer());
+
+        ReloadRawFileData(m_bReloadFile, false);
+        Invalidate();
+    }
+
 }

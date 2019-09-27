@@ -14,7 +14,7 @@
 // See alViewer.cpp for the implementation of this class
 //
 
-class CalViewerApp : public CWinApp
+class CalViewerApp : public CWinAppEx
 {
 public:
 	CalViewerApp();

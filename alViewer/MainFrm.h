@@ -32,6 +32,7 @@ protected:  // control bar embedded members
 	CToolBar          m_wndToolBar;
 	CToolBar          m_wndVideoBar;
 	CStatusBar        m_wndStatusBar;
+
 	bool			  m_bEnableToolbar;
 	bool			  m_bEnableVideobar;
 
@@ -41,6 +42,8 @@ public:
 public:
 	bool IsSelectMode() { return m_ToolBarFunc == TOOL_FUNC_SELECT; }
 	void DockControlBarLeftOf(CToolBar* Bar, CToolBar* LeftOf);
+	CDocument* GetDocument();
+    BOOL OnWindowCommand(UINT nID);
 
 public:
 	LRESULT OnUpdateStatusSize(WPARAM wParam, LPARAM lParam);
@@ -52,10 +55,10 @@ public:
 	LRESULT OnDisableToolbarStatus(WPARAM wParam, LPARAM lParam);
 	LRESULT OnUpdateDrawViewRect(WPARAM wParam, LPARAM lParam);
 	LRESULT OnStopPreviewVideo(WPARAM wParam, LPARAM lParam);
-	void OnFileOpen();
 
 // Generated message map functions
 protected:
+	afx_msg void OnFileOpen();
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
 	afx_msg void OnDropFiles(HDROP hDropInfo);
 	DECLARE_MESSAGE_MAP()
@@ -70,13 +73,20 @@ public:
 	afx_msg void OnUpdateViewerZoomout(CCmdUI *pCmdUI);
 	afx_msg void OnViewerZoomout();
 	afx_msg void OnViewerZoomfit();
+	afx_msg void OnViewerPreOne();
+	afx_msg void OnViewerNextOne();
 	afx_msg void OnUpdateViewerZoomfit(CCmdUI *pCmdUI);
+	afx_msg void OnUpdateViewerPreOne(CCmdUI *pCmdUI);
+	afx_msg void OnUpdateViewerNextOne(CCmdUI *pCmdUI);
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnUpdatePrevieweStart(CCmdUI *pCmdUI);
 	afx_msg void OnPrevieweStart();
 	afx_msg void OnUpdatePrevieweStop(CCmdUI *pCmdUI);
 	afx_msg void OnPrevieweStop();
+	afx_msg void OnViewShowHist();
+	afx_msg void OnUpdateViewShowHist(CCmdUI *pCmdUI);
+
 };
 
 

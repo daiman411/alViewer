@@ -10,9 +10,11 @@
 #endif
 
 #include "alViewerDoc.h"
+#include "alViewerView.h"
 #include "CalBitmapData.h"
 #include "CStreamCap.h"
 #include "DlgRawPaser.h"
+#include "alTaskImgProc.h"
 #include <propkey.h>
 #include <assert.h>
 
@@ -34,10 +36,17 @@ CalViewerDoc::CalViewerDoc()
 {
 	// TODO: add one-time construction code here
 	m_alBitmapData = std::shared_ptr<CalBitmapData>(new CalBitmapData());
+    m_taskImgProc = std::shared_ptr<CalTaskImgProc>(new CalTaskImgProc(this));
 
+	m_fldImgs.clear();
+	m_IdxOfFolderImage = 0;
+	m_pathCurrentImage = _T("");
 	DocMode = 0;	//0: common 1: raw 2: uvc
+	m_nVideoMode = 0;
 	pExitEvent = nullptr;
 	m_pVideoShowThread = nullptr;
+	m_pVideoRenderThread = nullptr;
+	m_strInputMediaDataPath = _T("");
 	m_ImgRawWidth = Global::RAW_IMAGE_WIDTH;
 	m_ImgRawHeight = Global::RAW_IMAGE_HEIGHT;
 	m_ImgRawFormat = Global::RAW_IMAGE_FORMAT;
@@ -47,6 +56,7 @@ CalViewerDoc::~CalViewerDoc()
 {
 	StopPreviewThread();
 
+	m_strInputMediaDataPath.Empty();
 	Global::RAW_IMAGE_WIDTH = ImgWidth();
 	Global::RAW_IMAGE_HEIGHT = ImgHeight();
 	Global::RAW_IMAGE_FORMAT = ImgFormat();
@@ -62,6 +72,19 @@ BOOL CalViewerDoc::OnNewDocument()
 	// TODO: add reinitialization code here
 	// (SDI documents will reuse this document)
 	m_sizeDoc = CSize(200, 200);
+
+	// Check if this is shell command
+	CString sCmdLine = AfxGetApp()->m_lpCmdLine;
+
+	if (!sCmdLine.IsEmpty())
+	{
+		AfxMessageBox(sCmdLine);
+		CWinApp* pApp = AfxGetApp();
+		ASSERT(pApp != NULL);
+
+		CString fileName = sCmdLine;
+		OnOpenDocument(fileName.GetBuffer());
+	}
 
 	return TRUE;
 }
@@ -151,6 +174,24 @@ void CalViewerDoc::Dump(CDumpContext& dc) const
 
 
 // CalViewerDoc commands
+CView* CalViewerDoc::GetActiveMainView()
+{
+    CView*pView = NULL;
+    POSITION pos = GetFirstViewPosition();
+
+    if (pos != NULL)
+    {
+        pView = GetNextView(pos);
+
+        if (pView != NULL)
+        {
+            return pView;
+        }
+    }
+
+    return nullptr;
+}
+
 
 std::shared_ptr<CalBitmapData> CalViewerDoc::BmpData()
 {
@@ -182,49 +223,95 @@ BITMAPINFO* CalViewerDoc::ImgBitmapInfo()
 	return &m_alBitmapData->BmpInfo;
 }
 
+BOOL CalViewerDoc::ClearBitmapImage()
+{
+	return m_alBitmapData->ClearBitmapData();
+}
+
+const TCHAR* CalViewerDoc::GetInputMediaPath()
+{
+	return m_strInputMediaDataPath.GetBuffer();
+}
+
 BOOL CalViewerDoc::OnOpenDocument(LPCTSTR lpszPathName)
 {
 	CString strFileName = lpszPathName;
-	const int extLen = strFileName.GetLength() - strFileName.ReverseFind('.') - 1;
-	CString strExtName = strFileName.Right(extLen);
+	CString strFolderPath = strFileName.Left(strFileName.ReverseFind(_T('\\')));
+	FindImageFiles(strFolderPath, m_fldImgs);
+	auto idx = std::find(std::begin(m_fldImgs),std::end(m_fldImgs), strFileName);
+	m_IdxOfFolderImage = (int)std::distance(std::begin(m_fldImgs), idx);
+	ClearBuffer = false;
 
-	if (strExtName.CompareNoCase(_T("UVC")) == 0)
+	return OpenImageFile(strFileName);
+}
+
+BOOL CalViewerDoc::OpenImageFile(CString a_filePath)
+{
+	CString strExtendName = _T("");
+	CString strFileName = a_filePath;
+    m_pathCurrentImage = a_filePath;
+
+	if (strFileName.Find(_T("None")) > 0)
+	{
+		if (!m_strInputMediaDataPath.IsEmpty())
+		{
+			strFileName = m_strInputMediaDataPath;
+			const int extLen = strFileName.GetLength() - strFileName.ReverseFind('.') - 1;
+			CString strExtName = strFileName.Right(extLen);
+			strExtendName = strExtName;
+		}
+	}
+	else
+	{
+		m_strInputMediaDataPath = strFileName;
+		const int extLen = strFileName.GetLength() - strFileName.ReverseFind('.') - 1;
+		CString strExtName = strFileName.Right(extLen);
+		strExtendName = strExtName;
+	}
+
+	if (a_filePath.CompareNoCase(_T("UVC")) == 0)
 	{
 		DocMode = 2;
 		CreateNewVideoStream();
 	}
+	else if (strExtendName.CompareNoCase(_T("mp4")) == 0)
+	{
+		DocMode = 2;
+		m_nVideoMode = 1;	//Direct show
+		CreateNewVideoRender();
+	}
 	else
 	{
-		if (strExtName.CompareNoCase(_T("bmp")) == 0)
+		if (strExtendName.CompareNoCase(_T("bmp")) == 0)
 		{
-			m_alBitmapData->LoadCommonFile(lpszPathName);
+			m_alBitmapData->LoadCommonFile(a_filePath.GetBuffer());
 		}
-		else if (strExtName.CompareNoCase(_T("jpg")) == 0 ||
-			strExtName.CompareNoCase(_T("jpeg")) == 0)
+		else if (strExtendName.CompareNoCase(_T("jpg")) == 0 ||
+			strExtendName.CompareNoCase(_T("jpeg")) == 0)
 		{
-			m_alBitmapData->LoadCommonFile(lpszPathName);
+			m_alBitmapData->LoadCommonFile(a_filePath.GetBuffer());
 		}
-		else if (strExtName.CompareNoCase(_T("jpg")) == 0)
+		else if (strExtendName.CompareNoCase(_T("jpg")) == 0)
 		{
-			m_alBitmapData->LoadCommonFile(lpszPathName);
+			m_alBitmapData->LoadCommonFile(a_filePath.GetBuffer());
 		}
-		else if (strExtName.CompareNoCase(_T("png")) == 0)
+		else if (strExtendName.CompareNoCase(_T("png")) == 0)
 		{
-			m_alBitmapData->LoadCommonFile(lpszPathName);
+			m_alBitmapData->LoadCommonFile(a_filePath.GetBuffer());
 			UpdateStatusSize(ImgWidth(), ImgHeight());
 		}
-		else if (strExtName.CompareNoCase(_T("tif")) == 0 ||
-			strExtName.CompareNoCase(_T("tiff")) == 0)
+		else if (strExtendName.CompareNoCase(_T("tif")) == 0 ||
+			strExtendName.CompareNoCase(_T("tiff")) == 0)
 		{
-			m_alBitmapData->LoadCommonFile(lpszPathName);
+			m_alBitmapData->LoadCommonFile(a_filePath.GetBuffer());
 		}
-		else if (strExtName.CompareNoCase(_T("raw")) == 0)
+		else if (strExtendName.CompareNoCase(_T("raw")) == 0)
 		{
 			DocMode = 1;
 
 			// Load Raw image format
 			CDlgRawPaser dlgRawPaser(NULL, this);
-			dlgRawPaser.SetRawPath(lpszPathName);
+			dlgRawPaser.SetRawPath(a_filePath.GetBuffer());
 			dlgRawPaser.SetWidth(m_ImgRawWidth);
 			dlgRawPaser.SetHeight(m_ImgRawHeight);
 			dlgRawPaser.SetFormat(m_ImgRawFormat);
@@ -251,8 +338,76 @@ BOOL CalViewerDoc::OnOpenDocument(LPCTSTR lpszPathName)
 	}
 
 	UpdateStatusToolbarStatus(true);
+	this->SetPathName(a_filePath.GetBuffer(), false);
 
 	return TRUE;
+}
+
+BOOL CalViewerDoc::SaveImageFile(CString a_filePath)
+{
+	try
+	{
+		m_alBitmapData->SaveCommonFile(a_filePath.GetBuffer());
+	}
+	catch (...)
+	{
+		AfxMessageBox(_T("Save image file failed!"));
+	}
+
+	return TRUE;
+}
+
+BOOL CalViewerDoc::SaveRawDataFile(CString a_filePath)
+{
+    try
+    {
+        FILE *pf = nullptr;
+
+        errno_t err;
+        err = _tfopen_s(&pf, a_filePath.GetBuffer(), _T("wb"));
+        if (err != 0) {
+            _tprintf(_T("can not create file %s.\n"), a_filePath.GetBuffer());
+            return FALSE;
+        }
+
+        //RGBA_BUFF buff;
+        //m_alBitmapData->GetBuff(CRect(0,0, m_ImgRawWidth, m_ImgRawHeight), &buff);
+
+        unsigned long size = m_ImgRawWidth*m_ImgRawHeight;
+        fwrite(m_alBitmapData->m_pImageBackup, sizeof(BYTE), size, pf);
+        //fwrite(buff.Y, sizeof(unsigned char), size, pf);
+        fclose(pf);
+    }
+    catch (...)
+    {
+        AfxMessageBox(_T("Save image file failed!"));
+    }
+
+    return TRUE;
+}
+
+void CalViewerDoc::StartPreviewThread()
+{
+	if (!m_strInputMediaDataPath.IsEmpty())
+	{
+		const int extLen = m_strInputMediaDataPath.GetLength() - m_strInputMediaDataPath.ReverseFind('.') - 1;
+		CString strExtName = m_strInputMediaDataPath.Right(extLen);
+
+		if (strExtName.CompareNoCase(_T("UVC")) == 0)
+		{
+			DocMode = 2;
+			m_nVideoMode = 0;
+			m_pVideoShowThread = nullptr;
+			CreateNewVideoStream();
+		}
+		else if (strExtName.CompareNoCase(_T("mp4")) == 0)
+		{
+			DocMode = 2;
+			m_nVideoMode = 1;
+			m_pVideoRenderThread = nullptr;
+			CreateNewVideoRender();
+		}
+	}
 }
 
 void CalViewerDoc::StopPreviewThread()
@@ -260,8 +415,18 @@ void CalViewerDoc::StopPreviewThread()
 	if (pExitEvent)
 	{
 		pExitEvent->SetEvent();
+
+		if (m_pVideoShowThread)
+		{
 		while (::WaitForSingleObject(m_pVideoShowThread->m_hThread, 1) != WAIT_OBJECT_0)
 			ApplicationDoEvent();
+		}
+
+		if (m_pVideoRenderThread)
+		{
+			while (::WaitForSingleObject(m_pVideoRenderThread->m_hThread, 1) != WAIT_OBJECT_0)
+				ApplicationDoEvent();
+		}
 
 		delete pExitEvent;
 		pExitEvent = nullptr;
@@ -270,6 +435,10 @@ void CalViewerDoc::StopPreviewThread()
 	if (m_pVideoShowThread)
 		delete m_pVideoShowThread;
 	m_pVideoShowThread = nullptr;
+
+	if (m_pVideoRenderThread)
+		delete m_pVideoRenderThread;
+	m_pVideoRenderThread = nullptr;
 }
 
 void CalViewerDoc::UpdateStatusSize(int w, int h)
@@ -348,6 +517,17 @@ void CalViewerDoc::CreateNewVideoStream()
 	}
 }
 
+void CalViewerDoc::CreateNewVideoRender()
+{
+	if (m_pVideoRenderThread == nullptr)
+	{
+		pExitEvent = new CEvent(FALSE, TRUE); // Manu is true to keep SetEvent status
+		m_pVideoRenderThread = ::AfxBeginThread(RenderVideoFrameThread, (LPVOID)this, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED, NULL);
+		m_pVideoRenderThread->m_bAutoDelete = TRUE;
+		m_pVideoRenderThread->ResumeThread();
+	}
+}
+
 void CalViewerDoc::UpdateViewFrame()
 {
 	CView*pView = NULL;
@@ -365,11 +545,87 @@ void CalViewerDoc::UpdateViewFrame()
 	}
 }
 
+CView* CalViewerDoc::GetViewFrame()
+{
+	CView*pView = NULL;
+	POSITION pos = GetFirstViewPosition();
+
+	if (pos != NULL)
+	{
+		pView = GetNextView(pos);
+
+		if (pView != NULL)
+		{
+			return pView;
+		}
+	}
+
+	return nullptr;
+}
+
+void CalViewerDoc::MoveToNextImage()
+{
+	if (++m_IdxOfFolderImage < (int)m_fldImgs.size())
+	{
+		ClearBuffer = true;
+		m_alBitmapData->ClearBitmapData();
+		CString strFilePath = m_fldImgs[m_IdxOfFolderImage];
+		OpenImageFile(strFilePath);
+	}
+	else
+	{
+		ClearBuffer = true;
+		m_IdxOfFolderImage = 0;
+		m_alBitmapData->ClearBitmapData();
+		CString strFilePath = m_fldImgs[m_IdxOfFolderImage];
+		OpenImageFile(strFilePath);
+	}
+}
+
+void CalViewerDoc::MoveToPreImage()
+{
+	if (--m_IdxOfFolderImage > 0)
+	{
+		ClearBuffer = true;
+		m_alBitmapData->ClearBitmapData();
+		CString strFilePath = m_fldImgs[m_IdxOfFolderImage];
+		OpenImageFile(strFilePath);
+	}
+	else
+	{
+		ClearBuffer = true;
+		m_alBitmapData->ClearBitmapData();
+		m_IdxOfFolderImage = (int)m_fldImgs.size() - 1;
+		CString strFilePath = m_fldImgs[m_IdxOfFolderImage];
+		OpenImageFile(strFilePath);
+	}
+}
+
+void CalViewerDoc::ExecuteImgProc(UINT mode)
+{
+    if (m_taskImgProc)
+    {
+        m_taskImgProc->ExecuteImgProcTask(mode);
+    }
+
+    while (!m_taskImgProc->IsTaskProcDone())
+    {
+        ApplicationDoEvent();
+    }
+
+    ClearBuffer = true;
+    CalViewerView* pView = static_cast<CalViewerView*>(GetActiveMainView());
+    //pView->UpdateMessageStr(&CString(m_taskImgProc->ProcMessage()));
+    UpdateViewFrame();
+
+    return;
+}
+
 UINT CalViewerDoc::CaptureVideoFrameThread(LPVOID lpParam)
 {
 	CalViewerDoc* doc = (CalViewerDoc*)lpParam;
 	
-	CStreamCap* videoDevice = new CStreamCap(AfxGetMainWnd()->GetSafeHwnd());
+	CStreamCap* videoDevice = new CStreamCap(AfxGetMainWnd()->GetSafeHwnd(), doc->GetVideoMode());
 
 	if (!videoDevice->InitialCap())
 		return 0;
@@ -377,7 +633,7 @@ UINT CalViewerDoc::CaptureVideoFrameThread(LPVOID lpParam)
 	if (!videoDevice->FindDevices())
 		return 0;
 
-	if (!videoDevice->ChooseDevices(_T(""), _T("")))
+	if (!videoDevice->ChooseDevices(1, 0))
 		return 0;
 
 	if (!videoDevice->BuildPreviewGraph(AfxGetMainWnd()->GetSafeHwnd()))
@@ -398,7 +654,7 @@ UINT CalViewerDoc::CaptureVideoFrameThread(LPVOID lpParam)
 	// Capture loop
 	while (::WaitForSingleObject(doc->pExitEvent->m_hObject, 1) != WAIT_OBJECT_0)
 	{
-		if (videoDevice->GrabFrame((unsigned char *)doc->BmpData()->m_pImageBuffer, false, false))
+		if (videoDevice->GrabFrame((unsigned char *)doc->BmpData()->m_pImageBuffer, false, true))
 		{
 			doc->BmpData()->CreateBitmapInfo(width, height, 8, 3);
 		}
@@ -414,6 +670,104 @@ UINT CalViewerDoc::CaptureVideoFrameThread(LPVOID lpParam)
 		return 0;
 
 	delete videoDevice; 
+	videoDevice = nullptr;
+
+	// Terminate the thread
+	::AfxEndThread(0, FALSE);
+
+	return 1;
+}
+
+bool CalViewerDoc::FindImageFiles(CString folderPath, std::vector<CString> &a_OutFile)
+{
+	bool IsFound = false;
+	TCHAR fileFound[256];
+	WIN32_FIND_DATA info;
+	HANDLE hFind;
+	_stprintf_s(fileFound, _T("%s\\*.*"), folderPath.GetBuffer());
+	hFind = FindFirstFile(fileFound, &info);
+
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		TRACE("Invalid File Handle. GetLastError reports %d\n", GetLastError());
+		IsFound = false;
+	}
+	else
+	{
+		do
+		{
+			_stprintf_s(fileFound, _T("%s\\%s"), folderPath.GetBuffer(), info.cFileName);
+
+			CString strFileName(info.cFileName);
+			strFileName.MakeLower();
+
+			if (strFileName.Find(_T("jpg")) > 0 || strFileName.Find(_T("img")) > 0 || 
+				strFileName.Find(_T("jpeg")) > 0 || strFileName.Find(_T("bmp")) > 0 ||
+				strFileName.Find(_T("png")) > 0 || strFileName.Find(_T("tiff")) > 0 )
+			{
+				a_OutFile.push_back(CString(fileFound));
+				IsFound = true;
+			}
+		} while (FindNextFile(hFind, &info));
+	}
+
+	FindClose(hFind);
+
+	return IsFound;
+}
+UINT CalViewerDoc::RenderVideoFrameThread(LPVOID lpParam)
+{
+	CalViewerDoc* doc = (CalViewerDoc*)lpParam;
+
+	CStreamCap* videoDevice = new CStreamCap(doc->GetViewFrame()->GetSafeHwnd(), doc->GetVideoMode());
+
+	if (!videoDevice->InitialCap(doc->GetInputMediaPath()))
+		return 0;
+
+	if (!videoDevice->FindDevices())
+		return 0;
+
+	if (!videoDevice->ChooseDevices(1, 0))
+		return 0;
+
+	if (!videoDevice->BuildPreviewGraph(AfxGetMainWnd()->GetSafeHwnd()))
+		return 0;
+
+	if (!videoDevice->StartPreview())
+		return 0;
+
+	const int width = videoDevice->VideoWidth();
+	const int height = videoDevice->VideoHeight();
+	doc->UpdateStatusSize(width, height);
+
+	//const int bufSize = width * height;
+	//doc->BmpData()->m_pImageBuffer = new BYTE[bufSize * 3];
+	//doc->BmpData()->BmpInfo.bmiHeader.biWidth = width;
+	//doc->BmpData()->BmpInfo.bmiHeader.biHeight = height;
+	//doc->UpdateStatusSize(width, height);
+	//doc->UpdateDrawViewRect();
+
+	// Capture loop
+	while (::WaitForSingleObject(doc->pExitEvent->m_hObject, 1) != WAIT_OBJECT_0)
+	{
+		if (videoDevice->GrabFrame((unsigned char *)doc->BmpData()->m_pImageBuffer, false, true))
+		{
+			continue;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	// Something wrong!! Need to fix
+	if (!videoDevice->StopPreview())
+		return 0;
+
+	if (!videoDevice->ReleaseCap())
+		return 0;
+
+	delete videoDevice;
 	videoDevice = nullptr;
 
 	// Terminate the thread

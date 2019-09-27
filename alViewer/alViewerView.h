@@ -23,6 +23,8 @@ public:
 	void ZoomView_In();
 	void ZoomView_Out();
 	void ZoomView_Fit();
+	void MoveNextOne();
+	void MovePrvousOne();
 	void UpdateDrawView();
 
 // Overrides
@@ -35,6 +37,7 @@ protected:
 	virtual void OnEndPrinting(CDC* pDC, CPrintInfo* pInfo);
 	virtual void OnInitialUpdate(); // called first time after construct
 	virtual void OnPrepareDC(CDC* pDC, CPrintInfo* pInfo = NULL);
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 
 // Implementation
 public:
@@ -63,7 +66,8 @@ protected:
 
 private:
 	CPoint ImagePtFromPB(CPoint &pt, CRect &rcDraw, int w, int h);
-	CPoint PBPtFromImage(CPoint &pt, CRect &rcDraw, int w, int h);
+    CPoint ImageUPtFromPB(CPoint &pt, CRect &rcDraw, int w, int h);
+    CPoint PBPtFromImage(CPoint &pt, CRect &rcDraw, int w, int h);
 	CRect ImageRectFromPB(CRect &rc, CRect &rcDraw, int w, int h);
 	CRect PBRectFromImage(CRect &rc, CRect &rcDraw, int w, int h);
 	CRect CalcDrawROI(CalViewerDoc* pDoc, CRect &rcClient);

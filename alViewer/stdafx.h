@@ -42,6 +42,14 @@ using namespace Gdiplus;
 #include "Define_ToolbarFun.h"
 
 
+#ifdef _UNICODE   
+#define tstring std::wstring   
+#define to_String std::to_wstring
+#else   
+#define tstring std::string   
+#define to_String std::to_string
+#endif
+
 
 
 #ifdef _UNICODE

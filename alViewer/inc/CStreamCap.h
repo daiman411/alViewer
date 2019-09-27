@@ -16,13 +16,14 @@ public:
 
 public:
 	virtual HRESULT Create(HWND hWnd);
-	virtual BOOL InitialCap();
+	virtual BOOL InitialCap(const TCHAR* name = nullptr);
 	virtual BOOL ReleaseCap();
 	virtual BOOL FindDevices();
-	virtual BOOL ChooseDevices(TCHAR *szVideo, TCHAR *szAudio);
+	virtual BOOL ChooseDevices(UINT idxVideo, UINT idxAudio);
 	virtual BOOL BuildPreviewGraph(HWND hWnd);
 	virtual BOOL StartPreview();
 	virtual BOOL StopPreview();
+	virtual BOOL PausePreview();
 	virtual BOOL GrabFrame(unsigned char * dstBuffer, bool flipRedAndBlue, bool flipImage);
 	virtual void ResizeWindow(HWND hWnd);
 	virtual LONG VideoInputCount();

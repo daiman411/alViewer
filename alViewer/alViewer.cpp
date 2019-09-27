@@ -19,7 +19,7 @@
 
 // CalViewerApp
 
-BEGIN_MESSAGE_MAP(CalViewerApp, CWinApp)
+BEGIN_MESSAGE_MAP(CalViewerApp, CWinAppEx)
 	ON_COMMAND(ID_APP_ABOUT, &CalViewerApp::OnAppAbout)
 	// Standard file based document commands
 	ON_COMMAND(ID_FILE_NEW, &CWinApp::OnFileNew)
@@ -125,10 +125,14 @@ BOOL CalViewerApp::InitInstance()
 	// Enable DDE Execute open
 	EnableShellOpen();
 	RegisterShellFileTypes(TRUE);
+	CString sCmdLine = m_lpCmdLine;
 
 	// Parse command line for standard shell commands, DDE, file open
 	CCommandLineInfo cmdInfo;
-	cmdInfo.m_nShellCommand = CCommandLineInfo::FileNothing;
+
+	if(sCmdLine.IsEmpty())
+		cmdInfo.m_nShellCommand =  CCommandLineInfo::FileNothing;
+
 	ParseCommandLine(cmdInfo);
 
 	// Dispatch commands specified on the command line.  Will return FALSE if

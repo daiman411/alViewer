@@ -16,6 +16,9 @@
     <Filter Include="Definition">
       <UniqueIdentifier>{dde57c00-1f1e-45eb-8ff5-402a2ebab197}</UniqueIdentifier>
     </Filter>
+    <Filter Include="TaskInstance">
+      <UniqueIdentifier>{c12fac35-0a77-4291-b848-01627354ff66}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -54,6 +57,15 @@
     <ClInclude Include="Define_ToolbarFun.h">
       <Filter>Definition</Filter>
     </ClInclude>
+    <ClInclude Include="DlgHistogram.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="alTaskImgProc.h">
+      <Filter>TaskInstance</Filter>
+    </ClInclude>
+    <ClInclude Include="ITask_ImgProc.h">
+      <Filter>TaskInstance</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="alViewer.cpp">
@@ -79,6 +91,15 @@
     </ClCompile>
     <ClCompile Include="Define_Globaldata.cpp">
       <Filter>Definition</Filter>
+    </ClCompile>
+    <ClCompile Include="DlgHistogram.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="alTaskImgProc.cpp">
+      <Filter>TaskInstance</Filter>
+    </ClCompile>
+    <ClCompile Include="ITask_ImgProc.cpp">
+      <Filter>TaskInstance</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

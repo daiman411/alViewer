@@ -39,6 +39,7 @@ private:
 	int m_height;
 	int m_header;
 	int m_stride;
+    int m_blvClamp;
 	int m_format;
 	int m_colorOrder;
 	CString m_ImgPath;
@@ -50,7 +51,7 @@ private:
 	std::unique_ptr<CDrawCanvas> m_pDrawCanvas;
 
 private:
-	void ReloadRawFileData(bool bReload);
+	void ReloadRawFileData(bool bReload, bool bUpdateStride=true);
 	int ConvertRawFormat(int index);
 	ULONGLONG QueryFileSize(CString rawPath);
 	CRect CalcDrawROI(CalViewerDoc* pDoc, CRect &rcClient);
@@ -66,7 +67,8 @@ public:
 	CEdit m_tbHeader;
 	CEdit m_tbPitch;
 	CEdit m_tbStride;
-	CButton m_ck_RGGB;
+    CEdit m_tbBLVClamp;
+    CButton m_ck_RGGB;
 	CButton m_ck_GRBG;
 	CButton m_ck_GBRG;
 	CButton m_ck_BGGR;
@@ -84,4 +86,6 @@ public:
 	afx_msg void OnEnChangeEditRawH();
 	afx_msg void OnEnChangeEditHeaderSize();
 	afx_msg void OnEnChangeEditStride();
+    afx_msg void OnEnChangeEditBlacklv();
+    
 };
